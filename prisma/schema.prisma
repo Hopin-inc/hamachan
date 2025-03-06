@@ -1,14 +1,145 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+  binaryTargets   = ["native"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum FactType {
+  QUANTITATIVE
+  QUALITATIVE
+}
+
+enum FactVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ServiceProviderType {
+  PRIVATE
+  GOVERNMENT
+}
+
+enum JobStatus {
+  OPEN
+  FULFILLED
+}
+
+enum JobOrigin {
+  EXTRACTED
+  SERVICE_DEFINED
+}
+
+model User {
+  id      String       @id @default(cuid())
+  name    String
+  email   String       @unique
+  sources UserSource[]
+}
+
+model Source {
+  id            String       @id @default(cuid())
+  name          String
+  url           String?
+  description   String?
+  extension     String?
+  transcription String? // 文字起こし結果などのテキストデータを格納
+  facts         Fact[]
+  users         UserSource[]
+}
+
+model Fact {
+  id         String         @id @default(cuid())
+  type       FactType
+  name       String
+  visibility FactVisibility @default(PUBLIC)
+  sourceId   String
+  source     Source         @relation(fields: [sourceId], references: [id])
+  labels     FactLabel[]
+  jobs       FactJob[]
+  serviceId  String?
+  service    Service?       @relation(fields: [serviceId], references: [id])
+}
+
+model Label {
+  id    String      @id @default(cuid())
+  name  String
+  facts FactLabel[]
+}
+
+model Job {
+  id            String            @id @default(cuid())
+  name          String
+  description   String?
+  status        JobStatus         @default(OPEN)
+  origin        JobOrigin         @default(EXTRACTED)
+  jobsFacts     FactJob[]
+  userScenarios UserScenarioJob[]
+  services      ServiceJob[]
+}
+
+model Service {
+  id          String              @id @default(cuid())
+  name        String
+  type        ServiceProviderType
+  description String?
+  facts       Fact[]
+  targetJobs  ServiceJob[]
+}
+
+model UserScenario {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  steps       Json?
+  jobs        UserScenarioJob[]
+}
+
+model FactLabel {
+  fact    Fact   @relation(fields: [factId], references: [id])
+  factId  String
+  label   Label  @relation(fields: [labelId], references: [id])
+  labelId String
+
+  @@id([factId, labelId])
+}
+
+model FactJob {
+  fact   Fact   @relation(fields: [factId], references: [id])
+  factId String
+  job    Job    @relation(fields: [jobId], references: [id])
+  jobId  String
+
+  @@id([factId, jobId])
+}
+
+model UserSource {
+  user     User   @relation(fields: [userId], references: [id])
+  userId   String
+  source   Source @relation(fields: [sourceId], references: [id])
+  sourceId String
+
+  @@id([userId, sourceId])
+}
+
+model UserScenarioJob {
+  scenario   UserScenario @relation(fields: [scenarioId], references: [id])
+  scenarioId String
+  job        Job          @relation(fields: [jobId], references: [id])
+  jobId      String
+
+  @@id([scenarioId, jobId])
+}
+
+model ServiceJob {
+  service   Service @relation(fields: [serviceId], references: [id])
+  serviceId String
+  job       Job     @relation(fields: [jobId], references: [id])
+  jobId     String
+
+  @@id([serviceId, jobId])
 }
